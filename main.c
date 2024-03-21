@@ -25,7 +25,7 @@ typedef struct Smartphone
     float weight;            /* Вес, граммы */
     float price;             /* Цена, доллары */
 
-    int index;
+    int index;               /* индекс */
     struct Smartphone *next; /* указатель на следующий элемент списка */
     struct Smartphone *prev; /* указатель на предыдущий элемент списка */
 } Smartphone;
@@ -321,9 +321,7 @@ void insert(Storage *storage, Smartphone *cur_position, Smartphone *new_position
 void delete_selected(Storage *storage, int index)
 {
     Smartphone *cur, *tmp;
-    int found;
     cur = storage->first_pos;
-    found = 0;
     if (storage->size == 0) printf("Market is empty\n");
     else
     {
@@ -334,6 +332,7 @@ void delete_selected(Storage *storage, int index)
             storage->last_pos->next = NULL;
             delete_position(cur);
             storage->max_index = storage->last_pos->index;
+            storage->size--;
         } else
         {
             if (index == 1)
@@ -341,9 +340,9 @@ void delete_selected(Storage *storage, int index)
                 storage->first_pos = cur->next;
                 cur->next->prev = NULL;
                 delete_position(cur);
-                found = 1;
                 storage->first_pos->index--;
                 cur = storage->first_pos->next;
+                storage->size--;
             }
             while (cur != NULL)
             {
@@ -353,23 +352,12 @@ void delete_selected(Storage *storage, int index)
                     cur->next = tmp->next;
                     tmp->next->prev = cur;
                     delete_position(tmp);
-                    found = 1;
                     cur = cur->next;
+                    storage->size--;
                 } else
-                {
-                    if (!found) cur = cur->next;
-                    else
-                    {
-                        cur->index--;
-                        if (cur->next && (cur->next->index - (cur->index + 1) > 1)) cur = NULL;
-                        else cur = cur->next;
-                    }
-//                    cur = cur->next;
-                }
+                    cur = cur->next;
             }
         }
-
-        storage->size--;
     }
 }
 
