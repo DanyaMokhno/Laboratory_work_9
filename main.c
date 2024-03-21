@@ -15,10 +15,18 @@ enum
     MAX_FILENAME_LEN = 20
 };
 
+typedef struct Brand
+{
+    int id;
+    char *name;
+//    struct Brand *prev;
+    struct Brand *next;
+} Brands;
+
 typedef struct Smartphone
 {
     char *model;             /* Модель */
-    char *brand;             /* Марка */
+    Brands *brand;           /* Марка */
     int ram;                 /* Объем оперативной памяти, ГБ */
     int memory;              /* Объем постоянной памяти, ГБ */
     float screen_size;       /* Размер экрана, дюймы */
@@ -40,11 +48,13 @@ typedef struct Storage
 
 Storage *create_storage();
 
-void fill_storage(Storage *storage, char *filename);
+void fill_storage(Storage *storage, char *filename, Brands **brands);
 
-Smartphone *create_position(char *string, int index);
+Smartphone *create_position(char *string, int index, Brands **brands);
 
-void set_values(Smartphone *smartphone, char *str);
+void set_values(Smartphone *smartphone, char *str, Brands **brands);
+
+void set_brand(Smartphone *smartphone, char *brand, Brands **brands);
 
 void add_first(Storage *storage, Smartphone *new_position);
 
@@ -71,8 +81,10 @@ void delete_storage(Storage *storage);
 int main()
 {
     Storage *Market;
+    Brands *brands = NULL;
     int len;
     char filename[MAX_FILENAME_LEN];
+
 
     /* ------------get filename--------------- */
     printf("Input filename: ");
@@ -83,7 +95,7 @@ int main()
 
     Market = create_storage();
 
-    fill_storage(Market, filename);
+    fill_storage(Market, filename, &brands);
 
     if (Market->size > 0)
     {
@@ -110,7 +122,7 @@ Storage *create_storage()
     return storage;
 }
 
-void fill_storage(Storage *storage, char *filename)
+void fill_storage(Storage *storage, char *filename, Brands **brands)
 {
     FILE *source;
     Smartphone *new_pos;
@@ -124,7 +136,7 @@ void fill_storage(Storage *storage, char *filename)
             // проходимся по файлу
             for (i = 1; fgets(tmp_str, MAX_STR_IN_FILE_LEN, source); i++)
             {
-                new_pos = create_position(tmp_str, i);
+                new_pos = create_position(tmp_str, i, brands);
                 if (i == 1) add_first(storage, new_pos);
                 else add(storage, storage->last_pos, new_pos);
             }
@@ -138,7 +150,7 @@ void fill_storage(Storage *storage, char *filename)
     }
 }
 
-Smartphone *create_position(char *string, int index)
+Smartphone *create_position(char *string, int index, Brands **brands)
 {
     Smartphone *position = NULL;
     position = (Smartphone *) malloc(sizeof(Smartphone));
@@ -147,18 +159,57 @@ Smartphone *create_position(char *string, int index)
         position->index = index;
         position->next = NULL;
         position->prev = NULL;
-        set_values(position, string);
+        set_values(position, string, brands);
     }
     return position;
 }
 
-void set_values(Smartphone *smartphone, char *str)
+void set_values(Smartphone *smartphone, char *str, Brands **brands)
 {
+    char *brand_name;
+
     smartphone->model = malloc(sizeof(char) * MAX_MODEL_NAME_LEN);
-    smartphone->brand = malloc(sizeof(char) * MAX_MODEL_NAME_LEN);
-    sscanf(str, "%[^,],%[^,],%d,%d,%f,%f,%f", smartphone->model, smartphone->brand,
+    smartphone->brand = NULL;
+    brand_name = malloc(sizeof(char) * MAX_MODEL_NAME_LEN);
+    sscanf(str, "%[^,],%[^,],%d,%d,%f,%f,%f", smartphone->model, brand_name,
            &(smartphone->ram), &(smartphone->memory), &(smartphone->screen_size),
            &(smartphone->weight), &(smartphone->price));
+    set_brand(smartphone, brand_name, brands);
+}
+
+void set_brand(Smartphone *smartphone, char *brand, Brands **brands)
+{
+    Brands *cur_brand, *prev_brand;
+    cur_brand = *brands;
+    prev_brand = NULL;
+
+    while (cur_brand != NULL)
+    {
+        if (strcmp(brand, cur_brand->name) == 0)
+        {
+            smartphone->brand = cur_brand;
+        }
+        prev_brand = cur_brand;
+        cur_brand = cur_brand->next;
+    }
+    if (smartphone->brand == NULL)
+    {
+        cur_brand = malloc(sizeof(Brands));
+        cur_brand->name = brand;
+        if (prev_brand)
+        {
+//            cur_brand->prev = prev_brand;
+            prev_brand->next = cur_brand;
+            cur_brand->id = prev_brand->id + 1;
+        } else
+        {
+            cur_brand->id = 1;
+            cur_brand->next = NULL;
+//            cur_brand->prev = NULL;
+        }
+        smartphone->brand = cur_brand;
+    } else free(brand);
+    if (*brands == NULL) *brands = cur_brand;
 }
 
 void add_first(Storage *storage, Smartphone *new_position)
@@ -250,16 +301,16 @@ void print_table(Storage *storage)
 
 void print(Smartphone *smartphone)
 {
-    printf("| %3i | %-20s | %-15s | %-3dGB | %-5dGB | %-5.2f\" | %-6.2fg | $%-7.2f | %p | %p\n",
-           smartphone->index, smartphone->model, smartphone->brand, smartphone->ram, smartphone->memory,
-           smartphone->screen_size, smartphone->weight, smartphone->price, smartphone->prev, smartphone->next);
+    printf("| %3i | %-20s | %-15s | %-3dGB | %-5dGB | %-5.2f\" | %-6.2fg | $%-7.2f |\n",
+           smartphone->index, smartphone->model, smartphone->brand->name, smartphone->ram, smartphone->memory,
+           smartphone->screen_size, smartphone->weight, smartphone->price);
 }
 
 void insert_selected(Storage *storage, char *string, int index)
 {
     Smartphone *new, *cur;
     int found = 0;
-    new = create_position(string, index);
+    new = create_position(string, index, &(storage->first_pos->brand));
     cur = storage->last_pos;
     if (storage->max_index < index)
     {
@@ -321,42 +372,50 @@ void insert(Storage *storage, Smartphone *cur_position, Smartphone *new_position
 void delete_selected(Storage *storage, int index)
 {
     Smartphone *cur, *tmp;
+    Brands *brand;
     cur = storage->first_pos;
     if (storage->size == 0) printf("Market is empty\n");
     else
     {
-        if (storage->max_index <= index)
+        // находим бренд по индексу
+        while (cur)
         {
+            if (cur->index == index)
+                brand = cur->brand;
+            cur = cur->next;
+        }
+        // ищем что удалить
+        if (storage->max_index <= index || storage->last_pos->brand == brand)
+        {
+            brand = storage->last_pos->brand;
             cur = storage->last_pos;
             storage->last_pos = cur->prev;
             storage->last_pos->next = NULL;
             delete_position(cur);
             storage->max_index = storage->last_pos->index;
             storage->size--;
-        } else
+        }
+        cur = storage->first_pos;
+        while (cur != NULL)
         {
-            if (index == 1)
+            if (storage->first_pos->brand == brand)
             {
                 storage->first_pos = cur->next;
                 cur->next->prev = NULL;
                 delete_position(cur);
-                storage->first_pos->index--;
-                cur = storage->first_pos->next;
+                cur = storage->first_pos;
                 storage->size--;
             }
-            while (cur != NULL)
+            else if (cur->next && cur->next->brand == brand)
             {
-                if (cur->next && cur->next->index == index)
-                {
-                    tmp = cur->next;
-                    cur->next = tmp->next;
-                    tmp->next->prev = cur;
-                    delete_position(tmp);
-                    cur = cur->next;
-                    storage->size--;
-                } else
-                    cur = cur->next;
-            }
+                tmp = cur->next;
+                cur->next = tmp->next;
+                tmp->next->prev = cur;
+                delete_position(tmp);
+                cur = cur->next;
+                storage->size--;
+            } else
+                cur = cur->next;
         }
     }
 }
@@ -364,7 +423,6 @@ void delete_selected(Storage *storage, int index)
 void delete_position(Smartphone *position)
 {
     free(position->model);
-    free(position->brand);
     position->next = NULL;
     position->prev = NULL;
     free(position);
