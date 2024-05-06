@@ -197,6 +197,7 @@ void set_brand(Smartphone *smartphone, char *brand, Brands **brands)
     {
         cur_brand = malloc(sizeof(Brands));
         cur_brand->name = brand;
+        cur_brand->next = NULL;
         if (prev_brand)
             prev_brand->next = cur_brand;
         else
